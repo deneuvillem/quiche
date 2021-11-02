@@ -67,7 +67,7 @@ fn main() {
     // Create the UDP listening socket, and register it with the event loop.
     let socket = net::UdpSocket::bind(args.listen).unwrap();
 
-    info!("listening on {:}", socket.local_addr().unwrap());
+    println!("listening on {:}", socket.local_addr().unwrap());
 
     let socket = mio::net::UdpSocket::from_socket(socket).unwrap();
     poll.register(
@@ -163,7 +163,7 @@ fn main() {
             // has expired, so handle it without attempting to read packets. We
             // will then proceed with the send loop.
             if events.is_empty() && !continue_write {
-                trace!("timed out");
+                println!("timed out");
 
                 clients.values_mut().for_each(|c| c.conn.on_timeout());
 
@@ -177,7 +177,7 @@ fn main() {
                     // There are no more UDP packets to read, so end the read
                     // loop.
                     if e.kind() == std::io::ErrorKind::WouldBlock {
-                        trace!("recv() would block");
+                        println!("recv() would block");
                         break 'read;
                     }
 
@@ -185,7 +185,7 @@ fn main() {
                 },
             };
 
-            trace!("got {} bytes", len);
+            println!("got {} bytes", len);
 
             let pkt_buf = &mut buf[..len];
 
@@ -208,12 +208,12 @@ fn main() {
                 Ok(v) => v,
 
                 Err(e) => {
-                    error!("Parsing packet header failed: {:?}", e);
+                    println!("Parsing packet header failed: {:?}", e);
                     continue 'read;
                 },
             };
 
-            trace!("got packet {:?}", hdr);
+            println!("got packet {:?}", hdr);
 
             let conn_id = ring::hmac::sign(&conn_id_seed, &hdr.dcid);
             let conn_id = &conn_id.as_ref()[..quiche::MAX_CONN_ID_LEN];
@@ -225,7 +225,7 @@ fn main() {
                 !clients.contains_key(&conn_id)
             {
                 if hdr.ty != quiche::Type::Initial {
-                    error!("Packet is not Initial");
+                    println!("Packet is not Initial");
                     continue 'read;
                 }
 
@@ -240,7 +240,7 @@ fn main() {
 
                     if let Err(e) = socket.send_to(out, &from) {
                         if e.kind() == std::io::ErrorKind::WouldBlock {
-                            trace!("send() would block");
+                            println!("send() would block");
                             break;
                         }
 
@@ -279,7 +279,7 @@ fn main() {
 
                         if let Err(e) = socket.send_to(out, &from) {
                             if e.kind() == std::io::ErrorKind::WouldBlock {
-                                trace!("send() would block");
+                                println!("send() would block");
                                 break;
                             }
 
@@ -293,12 +293,12 @@ fn main() {
                     // The token was not valid, meaning the retry failed, so
                     // drop the packet.
                     if odcid.is_none() {
-                        error!("Invalid address validation token");
+                        println!("Invalid address validation token");
                         continue;
                     }
 
                     if scid.len() != hdr.dcid.len() {
-                        error!("Invalid destination connection ID");
+                        println!("Invalid destination connection ID");
                         continue 'read;
                     }
 
@@ -309,7 +309,7 @@ fn main() {
 
                 let scid = quiche::ConnectionId::from_vec(scid.to_vec());
 
-                debug!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
+                println!("New connection: dcid={:?} scid={:?}", hdr.dcid, scid);
 
                 #[allow(unused_mut)]
                 let mut conn =
@@ -365,12 +365,12 @@ fn main() {
                 Ok(v) => v,
 
                 Err(e) => {
-                    error!("{} recv failed: {:?}", client.conn.trace_id(), e);
+                    println!("{} recv failed: {:?}", client.conn.trace_id(), e);
                     continue 'read;
                 },
             };
 
-            trace!("{} processed {} bytes", client.conn.trace_id(), read);
+            println!("{} processed {} bytes", client.conn.trace_id(), read);
 
             // Create a new application protocol session as soon as the QUIC
             // connection is established.
@@ -466,12 +466,12 @@ fn main() {
                     Ok(v) => v,
 
                     Err(quiche::Error::Done) => {
-                        trace!("{} done writing", client.conn.trace_id());
+                        println!("{} done writing", client.conn.trace_id());
                         break;
                     },
 
                     Err(e) => {
-                        error!("{} send failed: {:?}", client.conn.trace_id(), e);
+                        println!("{} send failed: {:?}", client.conn.trace_id(), e);
 
                         client.conn.close(false, 0x1, b"fail").ok();
                         break;
@@ -481,20 +481,20 @@ fn main() {
                 // TODO: coalesce packets.
                 if let Err(e) = socket.send_to(&out[..write], &send_info.to) {
                     if e.kind() == std::io::ErrorKind::WouldBlock {
-                        trace!("send() would block");
+                        println!("send() would block");
                         break;
                     }
 
                     panic!("send() failed: {:?}", e);
                 }
 
-                trace!("{} written {} bytes", client.conn.trace_id(), write);
+                println!("{} written {} bytes", client.conn.trace_id(), write);
 
                 // limit write bursting
                 client.bytes_sent += write;
 
                 if client.bytes_sent >= MAX_SEND_BURST_LIMIT {
-                    trace!(
+                    println!(
                         "{} pause writing at {}",
                         client.conn.trace_id(),
                         client.bytes_sent
@@ -508,10 +508,10 @@ fn main() {
 
         // Garbage collect closed connections.
         clients.retain(|_, ref mut c| {
-            trace!("Collecting garbage");
+            println!("Collecting garbage");
 
             if c.conn.is_closed() {
-                info!(
+                println!(
                     "{} connection collected {:?}",
                     c.conn.trace_id(),
                     c.conn.stats()
