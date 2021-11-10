@@ -143,8 +143,9 @@ fn main() {
     let mut pkt_count = 0;
 
     let mut continue_write = false;
-
+    println!("before loop");
     loop {
+        println!("enter loop");
         // Find the shorter timeout from all the active connections.
         //
         // TODO: use event loop that properly supports timers
@@ -159,6 +160,7 @@ fn main() {
         // Read incoming UDP packets from the socket and feed them to quiche,
         // until there are no more packets to read.
         'read: loop {
+            println!("enter read loop");
             // If the event loop reported no events, it means that the timeout
             // has expired, so handle it without attempting to read packets. We
             // will then proceed with the send loop.
@@ -231,6 +233,7 @@ fn main() {
 
                 if !quiche::version_is_supported(hdr.version) {
                     warn!("Doing version negotiation");
+                    println!("Doing version negotiation");
 
                     let len =
                         quiche::negotiate_version(&hdr.scid, &hdr.dcid, &mut out)
@@ -256,11 +259,13 @@ fn main() {
 
                 if !args.no_retry {
                     // Token is always present in Initial packets.
+                    println!("Token is always present in Initial packets.");
                     let token = hdr.token.as_ref().unwrap();
 
                     // Do stateless retry if the client didn't send a token.
                     if token.is_empty() {
                         warn!("Doing stateless retry");
+                        println!("Doing stateless retry");
 
                         let scid = quiche::ConnectionId::from_ref(&scid);
                         let new_token = mint_token(&hdr, &from);
@@ -378,6 +383,7 @@ fn main() {
                 (client.conn.is_in_early_data() ||
                     client.conn.is_established())
             {
+                println!("ALPN negotiation succeeded");
                 // At this stage the ALPN negotiation succeeded and selected a
                 // single application protocol name. We'll use this to construct
                 // the correct type of HttpConn but `application_proto()`
@@ -421,6 +427,7 @@ fn main() {
             }
 
             if client.http_conn.is_some() {
+                println!("enter client.http_conn.is_some()");
                 let conn = &mut client.conn;
                 let http_conn = client.http_conn.as_mut().unwrap();
                 let partial_responses = &mut client.partial_responses;
@@ -447,6 +454,7 @@ fn main() {
 
             // If we have a siduck connection, handle the quacks.
             if client.siduck_conn.is_some() {
+                println!("client.siduck_conn.is_some()");
                 let conn = &mut client.conn;
                 let si_conn = client.siduck_conn.as_mut().unwrap();
 
@@ -460,8 +468,10 @@ fn main() {
         // them on the UDP socket, until quiche reports that there are no more
         // packets to be sent.
         continue_write = false;
+        println!("before generating outgoing QUIC Packets");
         for client in clients.values_mut() {
             loop {
+                println!("in loop: generating outgoing QUIC Packets");
                 let (write, send_info) = match client.conn.send(&mut out) {
                     Ok(v) => v,
 
